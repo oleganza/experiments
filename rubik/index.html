@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<title>Cube Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #262626;
+    --text: #e5e5e5;
+    --muted: #737373;
+    --accent: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --radius: 10px;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+  }
+
+  body {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1rem;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0.25rem 0.25rem 1rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+
+  h1 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  h2 {
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .count {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  @media (min-width: 760px) {
+    .grid { grid-template-columns: 3fr 2fr; }
+    .span-2 { grid-column: 1 / -1; }
+  }
+
+  .scramble-card { text-align: center; }
+
+  .scramble {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 1rem;
+    line-height: 1.5;
+    letter-spacing: 0.04em;
+    word-spacing: 0.3em;
+    padding: 0.5rem 0.25rem;
+    overflow-wrap: break-word;
+  }
+
+  @media (min-width: 760px) {
+    .scramble { font-size: 1.2rem; }
+  }
+
+  .timer-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  @media (min-width: 760px) {
+    .timer-card { min-height: 280px; }
+  }
+
+  .timer {
+    font-size: 4.5rem;
+    font-weight: 200;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    transition: color 0.08s linear;
+  }
+
+  @media (min-width: 760px) {
+    .timer { font-size: 6.5rem; }
+  }
+
+  .timer.ready { color: var(--accent); }
+  .timer.holding { color: var(--warn); }
+
+  .hint {
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    min-height: 1.2em;
+    text-align: center;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.4rem 0;
+  }
+
+  .stat label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  .stat span {
+    font-size: 1.2rem;
+    font-weight: 400;
+  }
+
+  .chart-card { padding: 0.75rem 0.5rem 0.5rem 0.5rem; }
+  .chart-card h2 { padding-left: 0.5rem; }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 200px;
+  }
+
+  @media (min-width: 760px) {
+    canvas { height: 260px; }
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .toolbar h2 { margin: 0; flex: 1; }
+
+  button {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+  }
+
+  button:hover { background: #1f1f1f; }
+  button:active { background: #2a2a2a; }
+
+  button.danger { color: var(--danger); border-color: #3a1a1a; }
+  button.danger:hover { background: #2a1010; }
+
+  .solve-list {
+    list-style: none;
+    max-height: 380px;
+    overflow-y: auto;
+    margin: 0 -0.25rem;
+  }
+
+  .solve {
+    display: grid;
+    grid-template-columns: 2.4rem 1fr auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+    border-radius: 6px;
+  }
+
+  .solve:hover { background: rgba(255,255,255,0.03); }
+
+  .solve-num {
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-align: right;
+  }
+
+  .solve-time {
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  .solve-time.dnf { color: var(--danger); }
+  .solve-time.plus2 { color: var(--warn); }
+
+  .solve-scramble {
+    display: block;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .solve-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .solve:hover .solve-actions,
+  .solve:focus-within .solve-actions { opacity: 1; }
+
+  @media (hover: none) {
+    .solve-actions { opacity: 1; }
+  }
+
+  .solve-actions button {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .solve-actions button.active {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .empty {
+    color: var(--muted);
+    text-align: center;
+    padding: 2rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .footer-tip {
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-align: center;
+    margin: 1.5rem 0 0.5rem;
+  }
+
+  body.running .scramble-card,
+  body.running .stats-card,
+  body.running .chart-card,
+  body.running .solves-card,
+  body.running header {
+    opacity: 0.12;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+
+  body.running .timer-card { min-height: 320px; }
+
+  .file-input { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Cube Tracker</h1>
+  <span class="count" id="count">0 solves</span>
+</header>
+
+<div class="card scramble-card">
+  <div class="scramble" id="scramble"></div>
+  <button id="new-scramble" style="margin-top: 0.5rem;">New scramble</button>
+</div>
+
+<div class="grid">
+  <div class="card timer-card" id="timer-card">
+    <div class="timer" id="timer">0.00</div>
+    <div class="hint" id="hint">Hold Space (or touch) to begin</div>
+  </div>
+
+  <div class="card stats-card">
+    <h2>Stats</h2>
+    <div class="stats">
+      <div class="stat"><label>best</label><span id="s-best">—</span></div>
+      <div class="stat"><label>mean</label><span id="s-mean">—</span></div>
+      <div class="stat"><label>median&nbsp;5</label><span id="s-med5">—</span></div>
+      <div class="stat"><label>ao5</label><span id="s-ao5">—</span></div>
+      <div class="stat"><label>ao12</label><span id="s-ao12">—</span></div>
+      <div class="stat"><label>best&nbsp;ao5</label><span id="s-best-ao5">—</span></div>
+    </div>
+  </div>
+
+  <div class="card chart-card span-2">
+    <h2>Times &middot; green line is 5-run median</h2>
+    <canvas id="chart"></canvas>
+  </div>
+
+  <div class="card solves-card span-2">
+    <div class="toolbar">
+      <h2>Solves</h2>
+      <button id="export">Export</button>
+      <button id="import-btn">Import</button>
+      <input type="file" id="import-file" class="file-input" accept="application/json,.json">
+      <button id="clear" class="danger">Clear</button>
+    </div>
+    <ol class="solve-list" id="solve-list"></ol>
+  </div>
+</div>
+
+<div class="footer-tip">
+  Hold &nbsp;Space&nbsp; or touch the timer, release when green, tap again to stop &middot; All times stored locally
+</div>
+
+<script>
+'use strict';
+
+const STORAGE_KEY = 'cube-tracker-solves-v1';
+const HOLD_MS = 400;
+
+let solves = [];
+let nextId = 1;
+let currentScramble = '';
+
+// ── Storage ─────────────────────────────────────────────
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (Array.isArray(data.solves)) {
+      solves = data.solves;
+      nextId = data.nextId || (solves.length ? Math.max(...solves.map(s => s.id)) + 1 : 1);
+    }
+  } catch (e) {
+    console.warn('Load failed:', e);
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ solves, nextId }));
+  } catch (e) {
+    console.warn('Save failed:', e);
+  }
+}
+
+// ── Scramble (WCA-style, no same face twice, no 3 same axis) ──
+function generateScramble(length = 20) {
+  const faces = ['U', 'D', 'L', 'R', 'F', 'B'];
+  const mods = ['', "'", '2'];
+  const axisOf = { U: 0, D: 0, L: 1, R: 1, F: 2, B: 2 };
+  const result = [];
+  let lastFace = '', lastAxis = -1, prevAxis = -1;
+  while (result.length < length) {
+    const face = faces[Math.floor(Math.random() * faces.length)];
+    const axis = axisOf[face];
+    if (face === lastFace) continue;
+    if (axis === lastAxis && axis === prevAxis) continue;
+    result.push(face + mods[Math.floor(Math.random() * mods.length)]);
+    prevAxis = lastAxis;
+    lastAxis = axis;
+    lastFace = face;
+  }
+  return result.join(' ');
+}
+
+function newScramble() {
+  currentScramble = generateScramble();
+  document.getElementById('scramble').textContent = currentScramble;
+}
+
+// ── Format ──────────────────────────────────────────────
+function fmt(ms) {
+  if (ms == null || !isFinite(ms)) return '—';
+  if (ms < 60000) return (ms / 1000).toFixed(2);
+  const m = Math.floor(ms / 60000);
+  const s = ((ms % 60000) / 1000).toFixed(2).padStart(5, '0');
+  return `${m}:${s}`;
+}
+
+function effective(s) {
+  if (s.penalty === 'DNF') return Infinity;
+  if (s.penalty === '+2') return s.time + 2000;
+  return s.time;
+}
+
+// ── Stats ───────────────────────────────────────────────
+function median(arr) {
+  const v = arr.filter(t => isFinite(t)).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+}
+
+function rollingMedian5(times) {
+  return times.map((_, i) => median(times.slice(Math.max(0, i - 4), i + 1)));
+}
+
+// WCA average: drop top/bottom, mean of remainder. >1 DNF (in N≤12) ⇒ DNF.
+function avgOfN(allEff, n) {
+  if (allEff.length < n) return null;
+  const slice = allEff.slice(-n);
+  const drop = n <= 5 ? 1 : Math.ceil(n * 0.05);
+  if (slice.filter(t => !isFinite(t)).length > drop) return Infinity;
+  const sorted = [...slice].sort((a, b) => a - b);
+  const trimmed = sorted.slice(drop, n - drop);
+  return trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+}
+
+function bestAo5(allEff) {
+  if (allEff.length < 5) return null;
+  let best = Infinity;
+  for (let i = 5; i <= allEff.length; i++) {
+    const a = avgOfN(allEff.slice(0, i), 5);
+    if (a != null && isFinite(a) && a < best) best = a;
+  }
+  return isFinite(best) ? best : null;
+}
+
+function renderStats() {
+  const eff = solves.map(effective);
+  const finite = eff.filter(isFinite);
+
+  document.getElementById('count').textContent =
+    `${solves.length} solve${solves.length === 1 ? '' : 's'}`;
+
+  document.getElementById('s-best').textContent =
+    finite.length ? fmt(Math.min(...finite)) : '—';
+  document.getElementById('s-mean').textContent =
+    finite.length ? fmt(finite.reduce((a, b) => a + b, 0) / finite.length) : '—';
+
+  const meds = rollingMedian5(eff);
+  const lastMed = [...meds].reverse().find(m => m != null);
+  document.getElementById('s-med5').textContent = lastMed == null ? '—' : fmt(lastMed);
+
+  const ao5 = avgOfN(eff, 5);
+  document.getElementById('s-ao5').textContent =
+    ao5 == null ? '—' : (isFinite(ao5) ? fmt(ao5) : 'DNF');
+
+  const ao12 = avgOfN(eff, 12);
+  document.getElementById('s-ao12').textContent =
+    ao12 == null ? '—' : (isFinite(ao12) ? fmt(ao12) : 'DNF');
+
+  const ba5 = bestAo5(eff);
+  document.getElementById('s-best-ao5').textContent = ba5 == null ? '—' : fmt(ba5);
+}
+
+// ── Solves list ─────────────────────────────────────────
+function addSolve(time) {
+  solves.push({
+    id: nextId++,
+    time,
+    penalty: 'OK',
+    scramble: currentScramble,
+    date: Date.now(),
+  });
+  save();
+  renderAll();
+  newScramble();
+}
+
+function setPenalty(id, penalty) {
+  const s = solves.find(x => x.id === id);
+  if (!s) return;
+  s.penalty = s.penalty === penalty ? 'OK' : penalty;
+  save();
+  renderAll();
+}
+
+function deleteSolve(id) {
+  solves = solves.filter(s => s.id !== id);
+  save();
+  renderAll();
+}
+
+function renderSolves() {
+  const ol = document.getElementById('solve-list');
+  if (!solves.length) {
+    ol.innerHTML = '<li class="empty">No solves yet. Hold Space to start.</li>';
+    return;
+  }
+  ol.innerHTML = '';
+  for (let idx = solves.length - 1; idx >= 0; idx--) {
+    const s = solves[idx];
+    const eff = effective(s);
+    const cls = s.penalty === 'DNF' ? 'dnf' : (s.penalty === '+2' ? 'plus2' : '');
+    const display = s.penalty === 'DNF' ? 'DNF'
+                  : s.penalty === '+2' ? `${fmt(eff)}+`
+                  : fmt(s.time);
+    const li = document.createElement('li');
+    li.className = 'solve';
+    li.innerHTML =
+      `<span class="solve-num">#${idx + 1}</span>
+       <div>
+         <span class="solve-time ${cls}">${display}</span>
+         <span class="solve-scramble">${s.scramble || ''}</span>
+       </div>
+       <div class="solve-actions">
+         <button data-act="plus2" class="${s.penalty === '+2' ? 'active' : ''}">+2</button>
+         <button data-act="dnf" class="${s.penalty === 'DNF' ? 'active' : ''}">DNF</button>
+         <button data-act="del" class="danger">&times;</button>
+       </div>`;
+    li.querySelector('[data-act="plus2"]').onclick = () => setPenalty(s.id, '+2');
+    li.querySelector('[data-act="dnf"]').onclick = () => setPenalty(s.id, 'DNF');
+    li.querySelector('[data-act="del"]').onclick = () => {
+      if (confirm('Delete this solve?')) deleteSolve(s.id);
+    };
+    ol.appendChild(li);
+  }
+}
+
+// ── Chart ───────────────────────────────────────────────
+function drawChart() {
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth;
+  const cssH = canvas.clientHeight;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const padL = 56, padR = 14, padT = 10, padB = 26;
+  const W = cssW - padL - padR;
+  const H = cssH - padT - padB;
+
+  if (solves.length < 2) {
+    ctx.fillStyle = '#737373';
+    ctx.font = '13px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Chart appears after 2+ solves', cssW / 2, cssH / 2);
+    return;
+  }
+
+  const eff = solves.map(effective);
+  const finite = eff.filter(isFinite);
+  if (!finite.length) {
+    ctx.fillStyle = '#737373';
+    ctx.font = '13px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('All solves are DNF', cssW / 2, cssH / 2);
+    return;
+  }
+
+  const medians = rollingMedian5(eff);
+  const rawMax = Math.max(...finite);
+  const rawMin = Math.min(...finite);
+  const yMax = rawMax + (rawMax - rawMin) * 0.1 + 0.5;
+  const yMin = Math.max(0, rawMin - (rawMax - rawMin) * 0.1);
+
+  const xAt = i => padL + (i / (eff.length - 1)) * W;
+  const yAt = t => padT + (yMax === yMin ? H / 2 : (1 - (t - yMin) / (yMax - yMin)) * H);
+
+  // Grid + Y labels
+  ctx.strokeStyle = '#262626';
+  ctx.fillStyle = '#737373';
+  ctx.font = '11px system-ui';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 1;
+  const yTicks = 4;
+  for (let i = 0; i <= yTicks; i++) {
+    const t = yMin + (yMax - yMin) * (1 - i / yTicks);
+    const y = yAt(t);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + W, y);
+    ctx.stroke();
+    ctx.fillText(fmt(t), padL - 8, y);
+  }
+
+  // X labels
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const xTicks = Math.min(6, eff.length);
+  for (let i = 0; i < xTicks; i++) {
+    const idx = Math.round((i / Math.max(1, xTicks - 1)) * (eff.length - 1));
+    ctx.fillText(`#${idx + 1}`, xAt(idx), padT + H + 6);
+  }
+
+  // Raw dots
+  ctx.fillStyle = 'rgba(229,229,229,0.35)';
+  eff.forEach((t, i) => {
+    if (!isFinite(t)) return;
+    ctx.beginPath();
+    ctx.arc(xAt(i), yAt(t), 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // DNF markers
+  ctx.strokeStyle = '#f87171';
+  ctx.lineWidth = 1.4;
+  eff.forEach((t, i) => {
+    if (isFinite(t)) return;
+    const x = xAt(i), y = padT + 6;
+    ctx.beginPath();
+    ctx.moveTo(x - 3, y - 3); ctx.lineTo(x + 3, y + 3);
+    ctx.moveTo(x + 3, y - 3); ctx.lineTo(x - 3, y + 3);
+    ctx.stroke();
+  });
+
+  // 5-run median line
+  ctx.strokeStyle = '#4ade80';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  let started = false;
+  medians.forEach((m, i) => {
+    if (m == null) return;
+    const x = xAt(i), y = yAt(m);
+    if (!started) { ctx.moveTo(x, y); started = true; }
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function renderAll() {
+  renderStats();
+  renderSolves();
+  drawChart();
+}
+
+// ── Timer ───────────────────────────────────────────────
+let state = 'idle'; // idle | holding | ready | running | stopped
+let holdStart = 0;
+let runStart = 0;
+let rafId = null;
+
+const timerEl = document.getElementById('timer');
+const hintEl = document.getElementById('hint');
+const timerCard = document.getElementById('timer-card');
+
+const HINTS = {
+  idle: 'Hold Space (or touch) to begin',
+  holding: 'Keep holding…',
+  ready: 'Release to start',
+  running: 'Tap or press Space to stop',
+  stopped: 'Release to continue',
+};
+
+function updateChrome() {
+  timerEl.classList.toggle('ready', state === 'ready');
+  timerEl.classList.toggle('holding', state === 'holding');
+  document.body.classList.toggle('running', state === 'running');
+  hintEl.textContent = HINTS[state];
+}
+
+function tick() {
+  const elapsed = Date.now() - runStart;
+  timerEl.textContent = elapsed < 60000
+    ? (Math.floor(elapsed / 10) / 100).toFixed(2)
+    : fmt(elapsed);
+  rafId = requestAnimationFrame(tick);
+}
+
+function pressDown() {
+  if (state === 'running') {
+    cancelAnimationFrame(rafId);
+    const elapsed = Date.now() - runStart;
+    state = 'stopped';
+    timerEl.textContent = fmt(elapsed);
+    updateChrome();
+    addSolve(elapsed);
+    return;
+  }
+  if (state === 'idle') {
+    state = 'holding';
+    holdStart = Date.now();
+    timerEl.textContent = '0.00';
+    updateChrome();
+    setTimeout(() => {
+      if (state === 'holding' && Date.now() - holdStart >= HOLD_MS) {
+        state = 'ready';
+        updateChrome();
+      }
+    }, HOLD_MS + 10);
+  }
+}
+
+function pressUp() {
+  if (state === 'holding') {
+    state = 'idle';
+    updateChrome();
+  } else if (state === 'ready') {
+    state = 'running';
+    runStart = Date.now();
+    updateChrome();
+    tick();
+  } else if (state === 'stopped') {
+    state = 'idle';
+    updateChrome();
+  }
+}
+
+function isTypingTarget(el) {
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space') return;
+  if (isTypingTarget(e.target)) return;
+  if (e.target.tagName === 'BUTTON') e.target.blur();
+  e.preventDefault();
+  if (e.repeat) return;
+  pressDown();
+});
+
+document.addEventListener('keyup', e => {
+  if (e.code !== 'Space') return;
+  if (isTypingTarget(e.target)) return;
+  e.preventDefault();
+  pressUp();
+});
+
+timerCard.addEventListener('touchstart', e => { e.preventDefault(); pressDown(); }, { passive: false });
+timerCard.addEventListener('touchend', e => { e.preventDefault(); pressUp(); }, { passive: false });
+timerCard.addEventListener('touchcancel', () => {
+  if (state === 'holding' || state === 'ready') { state = 'idle'; updateChrome(); }
+});
+timerCard.addEventListener('mousedown', e => { if (e.button === 0) pressDown(); });
+timerCard.addEventListener('mouseup', e => { if (e.button === 0) pressUp(); });
+timerCard.addEventListener('mouseleave', () => {
+  if (state === 'holding' || state === 'ready') { state = 'idle'; updateChrome(); }
+});
+
+// ── Buttons ─────────────────────────────────────────────
+document.getElementById('new-scramble').onclick = () => { newScramble(); };
+
+document.getElementById('clear').onclick = () => {
+  if (!solves.length) return;
+  if (confirm(`Delete all ${solves.length} solves? This cannot be undone.`)) {
+    solves = [];
+    nextId = 1;
+    save();
+    renderAll();
+  }
+};
+
+document.getElementById('export').onclick = () => {
+  const data = { version: 1, exportedAt: new Date().toISOString(), nextId, solves };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cube-tracker-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+document.getElementById('import-btn').onclick = () => document.getElementById('import-file').click();
+document.getElementById('import-file').onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data.solves)) throw new Error('Missing "solves" array');
+      if (!confirm(`Import ${data.solves.length} solves? Current solves will be replaced.`)) {
+        e.target.value = '';
+        return;
+      }
+      solves = data.solves;
+      nextId = data.nextId || (solves.length ? Math.max(...solves.map(s => s.id || 0)) + 1 : 1);
+      save();
+      renderAll();
+    } catch (err) {
+      alert('Could not import: ' + err.message);
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+};
+
+document.addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') e.target.blur();
+});
+
+// ── Resize ──────────────────────────────────────────────
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(drawChart, 100);
+});
+
+// ── Boot ────────────────────────────────────────────────
+load();
+newScramble();
+renderAll();
+updateChrome();
+</script>
+</body>
+</html>
